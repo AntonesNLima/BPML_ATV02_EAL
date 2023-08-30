@@ -82,7 +82,7 @@ def calc_info_gain(leafe, initial_entropy, entropy_1, entropy_2):
         gain = -1*initial_entropy + (wheight_1*entropy_1 + wheight_2*entropy_1 + wheight_3*entropy_2)
     return gain
 
-def divide_pelo_limar(data,initial_entropy,threshold, name, i):
+def divide_pelo_limar(data,initial_entropy,threshold, name, array):
 
     leafe = pd.DataFrame(columns = {'type','value'})
     leafe1 = pd.DataFrame(columns = {'type','value'})
@@ -107,6 +107,81 @@ def divide_pelo_limar(data,initial_entropy,threshold, name, i):
     
     return GH,threshold
 
+def caca_limiar(data,name,initial_entropy):
+    
+    valores = data.sort_values(name)
+    valores.reset_index(drop=True,inplace=True)
+    GH_limiar = []
+    for i in range(valores.shape[0]-1):
+        if valores.Classe[i] != valores.Classe[i+1]:
+            array = [valores.Classe[i], valores.Classe[i+1]]
+            limiar = 0
+            limiar = (valores.iloc[i,1]+valores.iloc[i+1,1])/2
+            GH_limiar.append(divide_pelo_limar(data,initial_entropy,limiar, array))
+    GH_best,limiar_best = sorted(GH_limiar,reverse=True)[0]
+    return GH_best,limiar_best
 
 
+def rotula_rec(data,GHs,i):
+    # @param data Dataframe of the specific attribute
+    # @param GHs Dataframe of information gains and thresholds
+    # @param i Dataframe position
+    # return labels Vector of assigned labels
+
+    rotulos = pd.DataFrame({})
+    data.reset_index(drop=True,inplace=True)
+    if i < GHs.shape[1]:
+        for j in range(data.shape[0]):
+            if data[GHs['Nome'][i]][j] >= GHs['Limiar'][i]:
+                data['Classes_pred'][j] = 1
+            else:
+                data['Classes_pred'][j] = 2
+    else:
+        return
+    rotulos = data.query('Classes_pred==1')
+    rotulos = rotulos.append(data.query('Classes_pred==2'),ignore_index=True)
+    
+    rotula_rec(data.query('Classes_pred==1'),GHs,i+1)
+    rotula_rec(data.query('Classes_pred==2'),GHs,i+1)
+    
+    return rotulos['Classes_pred']
+
+def arvore_de_decisao_c45(X,y):
+    # @param X Training base
+    # @param y Test Base
+    # return Model accuracy
+
+    # Get the entropy from the database
+    entropia_pai = calcula_entropia(X)
+    
+    # Creates the dataframe that stores earnings
+    GHs = pd.DataFrame(columns = {'GH','Limiar','Nome'})
+    
+    # Get information data for each attribute
+    for coluna in X.columns[1:]:
+        df_aux = pd.DataFrame({})
+        df_aux = atributos[['Classe',coluna]]
+        GH,limiar = caca_limiar(df_aux,coluna,entropia_pai)  
+        GHs = GHs.append({'GH':GH,'Limiar':limiar,'Nome':coluna},ignore_index=True)
+
+    # Organizes the information gains in descending order
+    GHs.sort_values('GH',ascending=False,inplace=True)
+    GHs.reset_index(drop=True,inplace=True)
+
+    # Remove the labels from the test stand
+    y_pred = y.iloc[:,1:]
+    y_pred['Classes_pred'] = 0
+    y_pred['Classes_pred'] = rotula_rec(y_pred,GHs,0)
+    return (sum(y_pred['Classes_pred'] == y['Classe'])/y.shape[0])*100
+
+accs = []
+
+for _ in range(10):
+    print(_)
+    X,y = kfold_shuffle_estratificado(atributos)
+    accs.append(arvore_de_decisao_c45(X,y))
+
+plt.title(f'Acurácia média do modelo é: {np.mean(accs).round(2)}%')
+plt.plot(accs,'-')
+plt.show()
 print(calcula_entropia(data))
