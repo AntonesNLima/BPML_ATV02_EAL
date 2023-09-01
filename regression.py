@@ -102,11 +102,10 @@ def runRegressionWithBestParams():
     #print("\nCross validation RMSLE: {:.2f}".format(lgb_rmsle))
     # MAE
     #print("\nMAE: {:.2f}".format(mae(y_test, y_pred)))
-    return acuracia
-acuracia = runRegressionWithBestParams()
+    return y_pred
+y_pred = runRegressionWithBestParams()
 
-print(best_params, acuracia)
-
+# Enviando previsões realizadas com o modelo para o servidor
 URL = "https://aydanomachado.com/mlclass/03_Validation.php"
 
 #TODO Substituir pela sua chave aqui
@@ -114,8 +113,7 @@ DEV_KEY = "EA"
 
 # json para ser enviado para o servidor
 data = {'dev_key':DEV_KEY,
-        'predictions':pd.Series({ 'best_params': best_params, 'acuracia': acuracia }).to_json(orient='values')
-        }
+        'predictions':pd.Series(y_pred).to_json(orient='values')}
 
 # Enviando requisição e salvando o objeto resposta
 r = requests.post(url = URL, data = data)

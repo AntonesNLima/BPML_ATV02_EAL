@@ -9,6 +9,7 @@ from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 from sklearn import svm
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import requests
 
 url = 'https://raw.githubusercontent.com/lac1908/mlclass/master/03_Validation/abalone_dataset.csv'
 pd.read_csv(url)
@@ -46,4 +47,19 @@ clf.fit(X_train, y_train)
 
 y_pred = clf.predict(X_test)
 
-print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
+# Enviando previsões realizadas com o modelo para o servidor
+URL = "https://aydanomachado.com/mlclass/03_Validation.php"
+
+#TODO Substituir pela sua chave aqui
+DEV_KEY = "Laila"
+
+# json para ser enviado para o servidor
+data = {'dev_key':DEV_KEY,
+        'predictions':pd.Series(y_pred).to_json(orient='values')}
+
+# Enviando requisição e salvando o objeto resposta
+r = requests.post(url = URL, data = data)
+
+# Extraindo e imprimindo o texto da resposta
+pastebin_url = r.text
+print(" - Resposta do servidor:\n", r.text, "\n")
