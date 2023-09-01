@@ -9,18 +9,31 @@ from lightgbm import LGBMRegressor
 from scipy.stats import uniform, randint as sp_randint
 from sklearn.metrics import mean_squared_error as mse
 from sklearn.metrics import mean_absolute_error as mae
+import requests
 
-
-#Definição dos atributos e leitura dos dados abalone
+# Definição dos atributos e leitura dos dados abalone
 data = pd.read_csv('abalone_dataset.csv')
 
 columns = ['sex', 'length', 'diameter', 'height', 'whole_weight', 'shucked_weight', 'viscera_weight', 'shell_weight', 'type'] 
 
 data.columns = columns
 
-data = data.drop(columns=['sex'])
+sex_dummies = pd.get_dummies(data['sex'])
 
-#Definição das bases de aprendizagem treino e teste Y matendo proporções originais dos tipos
+# Renomear colunas para atingir o formato desejado
+sex_dummies.rename(columns={'M': 'Masculino', 'F': 'Feminino', 'I': 'Infantil'}, inplace=True)
+sex_dummies['Masculino'] = sex_dummies['Masculino'].astype(int)
+sex_dummies['Feminino'] = sex_dummies['Feminino'].astype(int)
+sex_dummies['Infantil'] = sex_dummies['Infantil'].astype(int)
+
+# Concatenar as novas colunas binárias com o DataFrame original
+data = pd.concat([data, sex_dummies], axis=1)
+
+# Remover a coluna 'sex' original
+data.drop('sex', axis=1, inplace=True)
+
+# Exibir o DataFrame resultante
+
 def random_kfold_shuffle(data):
     type1 = data.query('type == 1')
     type1.reset_index(drop=True,inplace=True)
@@ -72,9 +85,9 @@ def runGridSearchToEvaluateBestModelParams():
 
     best_params = lgb_random.best_params_
     print("\n\n\n")
-    print("Aooo...best params...:", best_params)
+    return best_params
 
-runGridSearchToEvaluateBestModelParams()
+best_params = runGridSearchToEvaluateBestModelParams()
 
 def runRegressionWithBestParams():
     global y_pred
@@ -82,11 +95,31 @@ def runRegressionWithBestParams():
     model = LGBMRegressor(**best_params, subsample=0.9, random_state=42, n_jobs=-1)
     model.fit(x_train, y_train)
     y_pred = model.predict(x_test)
-    print("\n")
-    print("Acurácia LGBMRegressor: {:.2f}".format(model.score(x_test, y_test)))
-    print('\nTest RMSLE: {:.2f}'.format(np.sqrt(mse(y_test, y_pred))))
+    #print("\n")
+    acuracia = "Acurácia LGBMRegressor: {:.2f}".format(model.score(x_test, y_test))
+    #print('\nTest RMSLE: {:.2f}'.format(np.sqrt(mse(y_test, y_pred))))
     lgb_rmsle = np.sqrt(mse(y_test, y_pred))
-    print("\nCross validation RMSLE: {:.2f}".format(lgb_rmsle))
+    #print("\nCross validation RMSLE: {:.2f}".format(lgb_rmsle))
     # MAE
-    print("\nMAE: {:.2f}".format(mae(y_test, y_pred)))
-runRegressionWithBestParams()
+    #print("\nMAE: {:.2f}".format(mae(y_test, y_pred)))
+    return acuracia
+acuracia = runRegressionWithBestParams()
+
+print(best_params, acuracia)
+
+URL = "https://aydanomachado.com/mlclass/03_Validation.php"
+
+#TODO Substituir pela sua chave aqui
+DEV_KEY = "EA"
+
+# json para ser enviado para o servidor
+data = {'dev_key':DEV_KEY,
+        'predictions':pd.Series({ 'best_params': best_params, 'acuracia': acuracia }).to_json(orient='values')
+        }
+
+# Enviando requisição e salvando o objeto resposta
+r = requests.post(url = URL, data = data)
+
+# Extraindo e imprimindo o texto da resposta
+pastebin_url = r.text
+print(" - Resposta do servidor:\n", r.text, "\n")
